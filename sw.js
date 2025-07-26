@@ -1,10 +1,10 @@
 // Performa Tracker Service Worker
-// Version 2.0.0 - Advanced PWA with offline capabilities
+// Version 2.0.1 - Fixed offline behavior and icons
 
-const CACHE_NAME = 'performa-tracker-v2.0.0';
-const STATIC_CACHE = 'performa-static-v2.0.0';
-const DYNAMIC_CACHE = 'performa-dynamic-v2.0.0';
-const IMAGE_CACHE = 'performa-images-v2.0.0';
+const CACHE_NAME = 'performa-tracker-v2.0.1';
+const STATIC_CACHE = 'performa-static-v2.0.1';
+const DYNAMIC_CACHE = 'performa-dynamic-v2.0.1';
+const IMAGE_CACHE = 'performa-images-v2.0.1';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -12,9 +12,7 @@ const STATIC_ASSETS = [
   './index.html',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png',
-  // Fallback offline page
-  'data:text/html,<!DOCTYPE html><html><head><title>Performa Tracker - Offline</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui;text-align:center;padding:2rem;background:linear-gradient(135deg,#e0f7fa,#ffffff);color:#00796b}h1{color:#004d40}p{color:#666;margin:1rem 0}.offline-icon{font-size:4rem;margin:2rem 0}</style></head><body><div class="offline-icon">🏋️‍♂️</div><h1>Performa Tracker</h1><p>You\'re currently offline</p><p>Your data is safely stored locally and will sync when you\'re back online.</p><button onclick="window.location.reload()" style="background:#00796b;color:white;border:none;padding:1rem 2rem;border-radius:8px;cursor:pointer;font-size:1rem">Try Again</button></body></html>'
+  './icons/icon-512.png'
 ];
 
 // External resources that should be cached
@@ -39,14 +37,26 @@ const CACHE_STRATEGIES = {
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
-  console.log('🚀 Performa SW: Installing service worker v2.0.0');
+  console.log('🚀 Performa SW: Installing service worker v2.0.1');
   
   event.waitUntil(
     Promise.all([
       // Cache static assets
       caches.open(STATIC_CACHE).then(cache => {
         console.log('📦 Performa SW: Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        return cache.addAll(STATIC_ASSETS).catch(error => {
+          console.warn('⚠️ Performa SW: Some assets failed to cache:', error);
+          // Try to cache assets individually
+          return Promise.allSettled(
+            STATIC_ASSETS.map(asset => 
+              fetch(asset).then(response => {
+                if (response.ok) {
+                  return cache.put(asset, response);
+                }
+              }).catch(err => console.warn(`Failed to cache ${asset}:`, err))
+            )
+          );
+        });
       }),
       
       // Cache external resources with error handling
@@ -73,7 +83,7 @@ self.addEventListener('install', event => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
-  console.log('🔄 Performa SW: Activating service worker v2.0.0');
+  console.log('🔄 Performa SW: Activating service worker v2.0.1');
   
   event.waitUntil(
     Promise.all([
@@ -127,29 +137,51 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// HTML request handler - Network first with offline fallback
+// HTML request handler - Cache first for PWA experience
 async function handleHTMLRequest(request) {
+  // Always try cache first for better PWA experience
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) {
+    console.log('📱 Performa SW: Serving cached HTML');
+    return cachedResponse;
+  }
+  
   try {
-    // Try network first
+    // Try network if not in cache
+    console.log('🌐 Performa SW: Fetching fresh HTML');
     const networkResponse = await fetch(request);
     if (networkResponse.ok) {
       // Update cache with fresh content
-      const cache = await caches.open(DYNAMIC_CACHE);
+      const cache = await caches.open(STATIC_CACHE);
       cache.put(request, networkResponse.clone());
       return networkResponse;
     }
   } catch (error) {
-    console.warn('🌐 Performa SW: Network failed for HTML, trying cache');
+    console.warn('🌐 Performa SW: Network failed for HTML');
   }
   
-  // Fallback to cache
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
-  }
-  
-  // Ultimate fallback - offline page
-  return new Response(STATIC_ASSETS[STATIC_ASSETS.length - 1], {
+  // If we get here, show a simple offline message
+  return new Response(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Performa Tracker - Connection Issue</title>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        body { font-family: system-ui; text-align: center; padding: 2rem; background: #e0f7fa; color: #00796b; }
+        h1 { color: #004d40; }
+        .icon { font-size: 3rem; margin: 1rem 0; }
+        button { background: #00796b; color: white; border: none; padding: 1rem 2rem; border-radius: 8px; cursor: pointer; }
+      </style>
+    </head>
+    <body>
+      <div class="icon">🏋️‍♂️</div>
+      <h1>Performa Tracker</h1>
+      <p>Unable to load the app. Please check your connection.</p>
+      <button onclick="window.location.reload()">Try Again</button>
+    </body>
+    </html>
+  `, {
     headers: { 'Content-Type': 'text/html' }
   });
 }
@@ -356,7 +388,7 @@ async function performDataBackup() {
 async function cleanupOldCaches() {
   const cacheNames = await caches.keys();
   const oldCaches = cacheNames.filter(name => 
-    name.startsWith('performa-') && !name.includes('v2.0.0')
+    name.startsWith('performa-') && !name.includes('v2.0.1')
   );
   
   await Promise.all(oldCaches.map(name => caches.delete(name)));
@@ -382,4 +414,4 @@ self.addEventListener('message', event => {
   }
 });
 
-console.log('🏋️‍♂️ Performa Tracker Service Worker v2.0.0 loaded successfully');
+console.log('🏋️‍♂️ Performa Tracker Service Worker v2.0.1 loaded successfully');
