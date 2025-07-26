@@ -6763,21 +6763,21 @@ function renderFields() {
 
   if (type === 'reps') {
     fields.innerHTML = `
-      <input placeholder="Exercise name" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
+      <input placeholder="Exercise name" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" onchange="triggerIdealAutofill(this.value)" onblur="triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
       <input type="number" placeholder="Actual reps" id="actualValue">
       <input type="number" placeholder="Ideal reps" id="idealValue">
     `;
     document.getElementById('jogControls').style.display = 'none';
   } else if (type === 'iso') {
     fields.innerHTML = `
-      <input placeholder="Exercise name" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
+      <input placeholder="Exercise name" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" onchange="triggerIdealAutofill(this.value)" onblur="triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
       <input type="number" placeholder="Actual time (sec)" id="actualValue">
       <input type="number" placeholder="Ideal time (sec)" id="idealValue">
     `;
     document.getElementById('jogControls').style.display = 'none';
   } else if (type === 'semi') {
     fields.innerHTML = `
-      <input placeholder="Exercise name" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
+      <input placeholder="Exercise name" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" onchange="triggerIdealAutofill(this.value)" onblur="triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
       <input type="number" placeholder="Actual time (sec)" id="actualValue">
       <input type="number" placeholder="Actual reps" id="reps">
       <input type="number" placeholder="Ideal time (sec)" id="idealTime">
@@ -6786,7 +6786,7 @@ function renderFields() {
     document.getElementById('jogControls').style.display = 'none';
   } else if (type === 'jog') {
     fields.innerHTML = `
-      <input placeholder="Jog Title (optional)" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
+      <input placeholder="Jog Title (optional)" id="exerciseName" oninput="showSuggestions(this.value); triggerIdealAutofill(this.value)" onchange="triggerIdealAutofill(this.value)" onblur="triggerIdealAutofill(this.value)" autocomplete="off" list="nameSuggestions">
       <input type="number" placeholder="Ideal distance (km)" id="idealDistance">
       <input type="number" placeholder="Ideal avg speed (km/h)" id="idealSpeed">
     `;
@@ -8324,37 +8324,45 @@ function createSemiIsometricTask() {
 // Instructions for testing autofill
 function showAutofillTestInstructions() {
   console.log(`
-🧪 AUTOFILL TESTING INSTRUCTIONS:
+🧪📱 MOBILE AUTOFILL TESTING INSTRUCTIONS:
 
-1. Quick setup and test everything:
+📱 FOR MOBILE USERS:
+1. Quick test everything:
    runCompleteAutofillTest()
 
-2. Or step by step:
-   a) checkDatabaseStatus()
-   b) createTestIdealData()
-   c) testManualTyping()
+2. Direct test (bypasses typing):
+   testDirectAutofill()
 
-3. Individual tests:
-   - testAutofill()
-   - testAllAutofill()
-   - debugIdeals()
+3. Test specific exercises:
+   testDirectAutofill('Plank', 'iso')
+   testDirectAutofill('Burpees', 'semi')
 
-4. Manual testing in UI:
+💻 FOR DESKTOP USERS:
+1. Step by step testing:
+   a) createTestIdealData()
+   b) testManualTyping()
+
+2. Manual UI testing:
    - Select activity type (reps/iso/semi/jog)
    - Type exercise name: "Push-ups", "Plank", "Burpees", or "Morning Run"
-   - Ideal values should auto-populate after you stop typing
+   - Ideal values should auto-populate
+
+🔧 TROUBLESHOOTING:
+- If typing doesn't work, try: testDirectAutofill()
+- Check database: checkDatabaseStatus()
+- View data: debugIdeals()
 
 Expected behavior:
-✅ Ideal values fill automatically for matching exercises
-✅ No disruption to typing experience
-✅ Works for all activity types
-❌ Should NOT change activity type during manual typing
+✅ Mobile: Autofill on blur/change events
+✅ Desktop: Autofill during typing
+✅ All activity types supported
   `);
 }
 
 // Complete autofill test workflow
 function runCompleteAutofillTest() {
-  console.log('🚀 Running complete autofill test workflow...');
+  console.log('🚀📱 Running complete autofill test workflow...');
+  console.log('Mobile device:', isMobile());
   
   // Step 1: Check database
   checkDatabaseStatus();
@@ -8365,16 +8373,60 @@ function runCompleteAutofillTest() {
     createTestIdealData();
     
     setTimeout(() => {
-      // Step 3: Test manual typing
-      console.log('\n🖊️ Testing manual typing...');
-      testManualTyping();
+      // Step 3: Test based on device type
+      if (isMobile()) {
+        console.log('\n📱 Testing mobile autofill...');
+        testMobileAutofill();
+      } else {
+        console.log('\n🖊️ Testing manual typing...');
+        testManualTyping();
+      }
     }, 1000);
   }, 500);
 }
 
+// Simple immediate autofill function for testing
+function testDirectAutofill(exerciseName = 'Push-ups', activityType = 'reps') {
+  console.log(`📱⚡ Testing immediate autofill: ${exerciseName} (${activityType})`);
+  
+  // Set form state
+  document.getElementById('type').value = activityType;
+  renderFields();
+  
+  setTimeout(() => {
+    // Set exercise name
+    const nameField = document.getElementById('exerciseName');
+    if (nameField) nameField.value = exerciseName;
+    
+    // Trigger autofill immediately without debounce
+    const currentType = document.getElementById('type')?.value;
+    const currentCategory = document.getElementById('category')?.value || 'C.S.A';
+    
+    console.log('Calling checkAndAutofillIdeal directly...');
+    checkAndAutofillIdeal(exerciseName, currentType, currentCategory);
+    
+    // Check result
+    setTimeout(() => {
+      let success = false;
+      if (activityType === 'reps') {
+        const value = document.getElementById('idealValue')?.value;
+        console.log('Result - ideal reps:', value);
+        success = !!value;
+      } else if (activityType === 'iso') {
+        const value = document.getElementById('idealValue')?.value;
+        console.log('Result - ideal time:', value);
+        success = !!value;
+      }
+      
+      console.log(success ? '✅ Direct autofill SUCCESS!' : '❌ Direct autofill FAILED!');
+    }, 100);
+  }, 200);
+}
+
 // Simulate manual typing to test autofill
 function testManualTyping() {
-  console.log('🖊️ Testing manual typing simulation...');
+  console.log('🖊️📱 Testing manual typing simulation...');
+  console.log('Mobile device detected:', isMobile());
   
   // Set activity type to reps
   document.getElementById('type').value = 'reps';
@@ -8385,8 +8437,15 @@ function testManualTyping() {
     const exerciseField = document.getElementById('exerciseName');
     if (exerciseField) {
       exerciseField.value = 'Push-ups';
-      console.log('💻 Triggering oninput event...');
+      console.log('💻 Triggering multiple events for mobile compatibility...');
+      
+      // Trigger all possible events for mobile compatibility
       triggerIdealAutofill('Push-ups');
+      
+      // Also try triggering the events directly
+      setTimeout(() => {
+        triggerIdealAutofill('Push-ups');
+      }, 50);
       
       setTimeout(() => {
         const idealField = document.getElementById('idealValue');
@@ -8395,12 +8454,39 @@ function testManualTyping() {
           console.log('✅ Manual typing autofill SUCCESS!');
         } else {
           console.log('❌ Manual typing autofill FAILED!');
+          console.log('Trying immediate autofill...');
+          checkAndAutofillIdeal('Push-ups', 'reps', 'C.S.A');
         }
-      }, 1000);
+      }, isMobile() ? 200 : 1000);
     } else {
       console.log('❌ Exercise name field not found!');
     }
   }, 100);
+}
+
+// Mobile-specific immediate autofill test
+function testMobileAutofill() {
+  console.log('📱 Mobile autofill test starting...');
+  
+  // Ensure we have test data
+  createTestIdealData();
+  
+  setTimeout(() => {
+    // Set form to reps type
+    document.getElementById('type').value = 'reps';
+    renderFields();
+    
+    setTimeout(() => {
+      // Directly test the autofill function
+      console.log('Testing direct autofill...');
+      checkAndAutofillIdeal('Push-ups', 'reps', 'C.S.A');
+      
+      setTimeout(() => {
+        const idealField = document.getElementById('idealValue');
+        console.log('Mobile test result:', idealField?.value);
+      }, 100);
+    }, 100);
+  }, 500);
 }
   
   // Function to debug complex tasks
@@ -8433,8 +8519,15 @@ function showAutofillFeedback() {
 // Debounce timer for autofill to prevent excessive calls during typing
 let autofillDebounceTimer = null;
 
+// Mobile detection
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+         ('ontouchstart' in window) || 
+         (navigator.maxTouchPoints > 0);
+}
+
 function triggerIdealAutofill(name) {
-  console.log('🔥 triggerIdealAutofill called with name:', name, 'length:', name?.length);
+  console.log('🔥📱 triggerIdealAutofill called with name:', name, 'length:', name?.length, 'mobile:', isMobile());
   
   // Clear previous debounce timer
   if (autofillDebounceTimer) {
@@ -8480,7 +8573,7 @@ function triggerIdealAutofill(name) {
     } else {
       console.log('❌ No current type selected, skipping autofill');
     }
-  }, 300); // Wait 300ms after user stops typing
+  }, isMobile() ? 100 : 300); // Shorter delay for mobile devices
 }
 
 // Function for voice commands that can change activity type and autofill
