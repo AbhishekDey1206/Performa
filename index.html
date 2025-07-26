@@ -3757,7 +3757,7 @@ function getVoiceCommands() {
 // Smart Exercise Logging with Activity Type Detection
 function handleSmartExerciseLogging(exerciseName) {
   console.log('handleSmartExerciseLogging called with:', exerciseName);
-  detectAndSetExerciseData(exerciseName, true); // true = voice command
+  detectAndSetExerciseDataForVoice(exerciseName); // Voice command version
 }
 
 // Timer Duration Handler
@@ -8016,49 +8016,59 @@ function createTestIdealData() {
     return;
   }
   
-  const testIdeals = [
-    {
-      name: 'Push-ups',
-      type: 'reps',
-      category: 'C.S.A',
-      idealReps: 20
-    },
-    {
-      name: 'Plank',
-      type: 'iso',
-      category: 'C.S.A', 
-      idealTime: 60
-    },
-    {
-      name: 'Burpees',
-      type: 'semi',
-      category: 'C.S.A',
-      idealTime: 45,
-      idealReps: 10
-    },
-    {
-      name: 'Morning Run',
-      type: 'jog',
-      category: 'Cardio',
-      idealDistance: 5,
-      idealSpeed: 10
-    }
-  ];
+  // Clear existing test data first
+  const clearTx = db.transaction("ideals", "readwrite");
+  const clearStore = clearTx.objectStore("ideals");
+  const clearReq = clearStore.clear();
   
-  const tx = db.transaction("ideals", "readwrite");
-  const store = tx.objectStore("ideals");
-  
-  testIdeals.forEach(ideal => {
-    store.add(ideal);
-  });
-  
-  tx.oncomplete = () => {
-    console.log('Test ideal data created successfully!');
-    console.log('You can now test autofill with: Push-ups, Plank, Burpees, or Morning Run');
-  };
-  
-  tx.onerror = (e) => {
-    console.log('Some test data may already exist (this is normal)');
+  clearReq.onsuccess = () => {
+    console.log('Cleared existing ideal data');
+    
+    const testIdeals = [
+      {
+        name: 'Push-ups',
+        type: 'reps',
+        category: 'C.S.A',
+        idealReps: 20
+      },
+      {
+        name: 'Plank',
+        type: 'iso',
+        category: 'C.S.A', 
+        idealTime: 60
+      },
+      {
+        name: 'Burpees',
+        type: 'semi',
+        category: 'C.S.A',
+        idealTime: 45,
+        idealReps: 10
+      },
+      {
+        name: 'Morning Run',
+        type: 'jog',
+        category: 'Cardio',
+        idealDistance: 5,
+        idealSpeed: 10
+      }
+    ];
+    
+    const tx = db.transaction("ideals", "readwrite");
+    const store = tx.objectStore("ideals");
+    
+    testIdeals.forEach(ideal => {
+      store.add(ideal);
+    });
+    
+    tx.oncomplete = () => {
+      console.log('Test ideal data created successfully!');
+      console.log('You can now test autofill with: Push-ups, Plank, Burpees, or Morning Run');
+      debugIdeals(); // Show what was created
+    };
+    
+    tx.onerror = (e) => {
+      console.error('Error adding test data:', e);
+    };
   };
 }
 
@@ -8068,6 +8078,7 @@ function testAutofill() {
   if (exerciseName) {
     console.log('=== TESTING AUTOFILL FOR:', exerciseName, '===');
     console.log('Current activity type:', document.getElementById('type')?.value);
+    console.log('Current category:', document.getElementById('category')?.value);
     console.log('Database ready:', !!db);
     
     // Test the autofill function
@@ -8077,31 +8088,109 @@ function testAutofill() {
     setTimeout(() => {
       console.log('=== AUTOFILL TEST RESULTS ===');
       const type = document.getElementById('type')?.value;
+      const category = document.getElementById('category')?.value;
+      const exerciseField = document.getElementById('exerciseName')?.value;
+      
       console.log('Activity type after autofill:', type);
+      console.log('Category after autofill:', category);
+      console.log('Exercise name field value:', exerciseField);
       
       if (type === 'reps') {
         const idealValue = document.getElementById('idealValue')?.value;
         console.log('Ideal reps value:', idealValue);
+        if (!idealValue) console.log('❌ No ideal value set for reps!');
       } else if (type === 'iso') {
         const idealValue = document.getElementById('idealValue')?.value;
         console.log('Ideal time value:', idealValue);
+        if (!idealValue) console.log('❌ No ideal value set for iso!');
       } else if (type === 'semi') {
         const idealTime = document.getElementById('idealTime')?.value;
         const idealReps = document.getElementById('idealReps')?.value;
         console.log('Ideal time value:', idealTime);
         console.log('Ideal reps value:', idealReps);
+        if (!idealTime || !idealReps) console.log('❌ Missing ideal values for semi!');
       } else if (type === 'jog') {
         const idealDistance = document.getElementById('idealDistance')?.value;
         const idealSpeed = document.getElementById('idealSpeed')?.value;
         console.log('Ideal distance value:', idealDistance);
         console.log('Ideal speed value:', idealSpeed);
+        if (!idealDistance || !idealSpeed) console.log('❌ Missing ideal values for jog!');
       }
       console.log('=== END AUTOFILL TEST ===');
-    }, 200);
+    }, 300);
   }
-}
+  }
 
-// Test function for smart detection
+// Comprehensive test for all activity types
+function testAllAutofill() {
+  if (!db) {
+    console.log('Database not ready');
+    return;
+  }
+  
+  const tests = [
+    { name: 'Push-ups', type: 'reps' },
+    { name: 'Plank', type: 'iso' },
+    { name: 'Burpees', type: 'semi' },
+    { name: 'Morning Run', type: 'jog' }
+  ];
+  
+  let currentTest = 0;
+  
+  const runNextTest = () => {
+    if (currentTest >= tests.length) {
+      console.log('🎉 All autofill tests completed!');
+      return;
+    }
+    
+    const test = tests[currentTest];
+    console.log(`\n=== TEST ${currentTest + 1}: ${test.name} (${test.type}) ===`);
+    
+    // Set the activity type first
+    document.getElementById('type').value = test.type;
+    renderFields();
+    
+    setTimeout(() => {
+      // Now test autofill
+      triggerIdealAutofill(test.name);
+      
+      setTimeout(() => {
+        const type = document.getElementById('type')?.value;
+        console.log(`Type: ${type}`);
+        
+        let success = false;
+        if (test.type === 'reps') {
+          const value = document.getElementById('idealValue')?.value;
+          console.log(`Ideal reps: ${value}`);
+          success = !!value;
+        } else if (test.type === 'iso') {
+          const value = document.getElementById('idealValue')?.value;
+          console.log(`Ideal time: ${value}`);
+          success = !!value;
+        } else if (test.type === 'semi') {
+          const time = document.getElementById('idealTime')?.value;
+          const reps = document.getElementById('idealReps')?.value;
+          console.log(`Ideal time: ${time}, reps: ${reps}`);
+          success = !!time && !!reps;
+        } else if (test.type === 'jog') {
+          const distance = document.getElementById('idealDistance')?.value;
+          const speed = document.getElementById('idealSpeed')?.value;
+          console.log(`Ideal distance: ${distance}, speed: ${speed}`);
+          success = !!distance && !!speed;
+        }
+        
+        console.log(`Result: ${success ? '✅ SUCCESS' : '❌ FAILED'}`);
+        
+        currentTest++;
+        setTimeout(runNextTest, 500);
+      }, 200);
+    }, 100);
+  };
+  
+  runNextTest();
+}
+  
+  // Test function for smart detection
 function testSmartDetection() {
   const exerciseName = prompt('Enter exercise name to test smart detection:');
   if (exerciseName) {
@@ -8197,9 +8286,39 @@ function createSemiIsometricTask() {
   
   alert('Semi-isometric test task created! Try saying "setup plank workout" - it will set both ideal time (60s) and ideal reps (3)');
   console.log('Created semi-isometric test task:', semiTask);
-}
+  }
 
-// Function to debug complex tasks
+// Instructions for testing autofill
+function showAutofillTestInstructions() {
+  console.log(`
+🧪 AUTOFILL TESTING INSTRUCTIONS:
+
+1. First, create test data:
+   createTestIdealData()
+
+2. Test individual exercise:
+   testAutofill()
+
+3. Test all exercises automatically:
+   testAllAutofill()
+
+4. View current ideal data:
+   debugIdeals()
+
+5. Manual testing in UI:
+   - Select activity type (reps/iso/semi/jog)
+   - Type exercise name: "Push-ups", "Plank", "Burpees", or "Morning Run"
+   - Ideal values should auto-populate after you stop typing
+
+Expected behavior:
+✅ Ideal values fill automatically for matching exercises
+✅ No disruption to typing experience
+✅ Works for all activity types
+❌ Should NOT change activity type during manual typing
+  `);
+}
+  
+  // Function to debug complex tasks
 function debugComplexTasks() {
   console.log('Current complex tasks:', complexTasks);
   console.log('Complex tasks in localStorage:', JSON.parse(localStorage.getItem('complexTasks') || '[]'));
@@ -8226,8 +8345,17 @@ function showAutofillFeedback() {
     }, 1000);
   }
 }
+// Debounce timer for autofill to prevent excessive calls during typing
+let autofillDebounceTimer = null;
+
 function triggerIdealAutofill(name) {
   console.log('triggerIdealAutofill called with name:', name);
+  
+  // Clear previous debounce timer
+  if (autofillDebounceTimer) {
+    clearTimeout(autofillDebounceTimer);
+  }
+  
   if (!db) {
     console.log('Database not ready, skipping autofill');
     return; // Wait for database to be ready
@@ -8237,16 +8365,31 @@ function triggerIdealAutofill(name) {
     return;
   }
   
-  console.log('Starting ideal autofill for:', name.trim());
-  
-  // Add a small delay to ensure any previous DOM changes are complete
-  setTimeout(() => {
-    // Use the same smart detection logic as voice commands
-    detectAndSetExerciseData(name.trim(), false); // false = manual typing, true = voice command
-  }, 10);
+  // Debounce the autofill to avoid excessive calls during typing
+  autofillDebounceTimer = setTimeout(() => {
+    console.log('Starting ideal autofill for:', name.trim());
+    
+    // For manual typing, only autofill ideal values for current activity type
+    // Don't change the activity type to avoid disrupting user input
+    const currentType = document.getElementById('type')?.value;
+    const currentCategory = document.getElementById('category')?.value;
+    
+    if (currentType) {
+      console.log('Manual autofill for current type:', currentType);
+      checkAndAutofillIdeal(name.trim(), currentType, currentCategory);
+    }
+  }, 500); // Wait 500ms after user stops typing
 }
 
-function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
+// Function for voice commands that can change activity type and autofill
+function detectAndSetExerciseDataForVoice(exerciseName) {
+  console.log('detectAndSetExerciseDataForVoice called with:', exerciseName);
+  
+  // This function is used by voice commands and can change activity type
+  detectAndSetExerciseData(exerciseName, true);
+}
+  
+  function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
   console.log('detectAndSetExerciseData called with:', exerciseName, 'isVoiceCommand:', isVoiceCommand);
   
   // Validation function for ideal match data
@@ -8413,15 +8556,40 @@ function checkAndAutofillIdeal(name, type, category) {
     req.onsuccess = () => {
       const ideals = req.result;
       console.log('checkAndAutofillIdeal: searching in ideals:', ideals);
-      const match = ideals.find(e =>
+      
+      // First try to find exact match with type and category
+      let match = ideals.find(e =>
         e.name?.toLowerCase() === name.toLowerCase() &&
         e.type === type &&
         e.category === category
       );
+      
+      // If no exact match, try to find by name and type only
+      if (!match) {
+        match = ideals.find(e =>
+          e.name?.toLowerCase() === name.toLowerCase() &&
+          e.type === type
+        );
+      }
+      
+      // If still no match, try to find any ideal with the same name
+      if (!match) {
+        match = ideals.find(e =>
+          e.name?.toLowerCase() === name.toLowerCase()
+        );
+        
+        // If found, but it's for a different activity type, don't autofill
+        // (this avoids confusion)
+        if (match && match.type !== type) {
+          console.log('Found ideal for different activity type:', match.type, 'vs', type);
+          return;
+        }
+      }
+      
       console.log('checkAndAutofillIdeal: found match:', match);
 
       if (!match) {
-        console.log('No exact match found in checkAndAutofillIdeal');
+        console.log('No match found in checkAndAutofillIdeal');
         return;
       }
 
