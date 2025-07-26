@@ -9867,6 +9867,132 @@ window.addEventListener('beforeunload', () => {
     recognizer = null;
   }
 });
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('./sw.js');
+      console.log('🚀 Performa PWA: Service Worker registered successfully:', registration.scope);
+      
+      // Handle service worker updates
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Show update notification
+            if (confirm('🔄 New version available! Restart to update Performa Tracker?')) {
+              newWorker.postMessage({ type: 'SKIP_WAITING' });
+              window.location.reload();
+            }
+          }
+        });
+      });
+      
+      // Listen for service worker messages
+      navigator.serviceWorker.addEventListener('message', event => {
+        console.log('💬 Message from Service Worker:', event.data);
+        if (event.data.type === 'SYNC_COMPLETE') {
+          console.log('✅ Data sync completed');
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Performa PWA: Service Worker registration failed:', error);
+    }
+  });
+  
+  // Handle service worker controlled
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('🔄 Performa PWA: Service Worker controller changed');
+    window.location.reload();
+  });
+}
+
+// PWA Install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  console.log('📱 Performa PWA: Install prompt triggered');
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  // Show custom install button
+  const installBtn = document.createElement('button');
+  installBtn.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #00796b;
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 1000;
+    transition: all 0.3s ease;
+  `;
+  installBtn.innerHTML = '📱 Install App';
+  installBtn.onmouseover = () => installBtn.style.background = '#004d40';
+  installBtn.onmouseout = () => installBtn.style.background = '#00796b';
+  installBtn.onclick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`📱 Install outcome: ${outcome}`);
+      deferredPrompt = null;
+      installBtn.remove();
+    }
+  };
+  document.body.appendChild(installBtn);
+  
+  // Auto-hide after 15 seconds
+  setTimeout(() => {
+    if (installBtn.parentNode) {
+      installBtn.style.opacity = '0';
+      setTimeout(() => installBtn.remove(), 300);
+    }
+  }, 15000);
+});
+
+// Track app install
+window.addEventListener('appinstalled', () => {
+  console.log('🎉 Performa PWA: App installed successfully');
+  deferredPrompt = null;
+});
+
+// Handle URL parameters for shortcuts
+window.addEventListener('load', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const action = urlParams.get('action');
+  
+  if (action) {
+    console.log('🔗 Performa PWA: Handling shortcut action:', action);
+    setTimeout(() => {
+      switch (action) {
+        case 'log':
+          // Focus on exercise logging
+          document.getElementById('exerciseName')?.focus();
+          break;
+        case 'timer':
+          // Start timer
+          startTimer();
+          break;
+        case 'progress':
+          // Open progress view
+          showProgressView();
+          break;
+        case 'jog':
+          // Start jogging
+          startJogging();
+          break;
+        default:
+          console.log('Unknown action:', action);
+      }
+    }, 1000);
+  }
+});
 </script>
 </body>
 </html>
