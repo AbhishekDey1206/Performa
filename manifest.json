@@ -9,6 +9,7 @@
   "orientation": "portrait-primary",
   "theme_color": "#00796b",
   "background_color": "#e0f7fa",
+  "splash_pages": null,
   "lang": "en",
   "dir": "ltr",
   "categories": ["health", "fitness", "sports", "productivity", "lifestyle"],

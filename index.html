@@ -1023,6 +1023,170 @@
   </style>
 </head>
 <body>
+  <!-- Custom Splash Screen -->
+  <div id="splashScreen" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #e0f7fa 0%, #b2dfdb 50%, #80cbc4 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    transition: opacity 0.5s ease-out;
+  ">
+    <div style="text-align: center; animation: fadeInUp 1s ease-out;">
+      <!-- App Icon -->
+      <div style="
+        width: 120px;
+        height: 120px;
+        background: #00796b;
+        border-radius: 24px;
+        margin: 0 auto 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 48px;
+        color: white;
+        box-shadow: 0 8px 32px rgba(0, 121, 107, 0.3);
+        animation: bounceIn 1.2s ease-out;
+      ">
+        🏋️‍♂️
+      </div>
+      
+      <!-- App Name -->
+      <h1 style="
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #004d40;
+        margin: 0 0 10px 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        animation: slideInFromLeft 1s ease-out 0.3s both;
+      ">
+        Performa
+      </h1>
+      
+      <!-- Tagline -->
+      <p style="
+        font-size: 1.1rem;
+        color: #00796b;
+        margin: 0 0 40px 0;
+        font-weight: 500;
+        animation: slideInFromRight 1s ease-out 0.5s both;
+      ">
+        Voice-Enabled Fitness Tracker
+      </p>
+      
+      <!-- Loading Animation -->
+      <div style="
+        width: 50px;
+        height: 50px;
+        margin: 0 auto;
+        animation: spin 2s linear infinite;
+      ">
+        <div style="
+          width: 100%;
+          height: 100%;
+          border: 4px solid rgba(0, 121, 107, 0.2);
+          border-top: 4px solid #00796b;
+          border-radius: 50%;
+        "></div>
+      </div>
+      
+      <!-- Loading Text -->
+      <p style="
+        font-size: 0.9rem;
+        color: #00796b;
+        margin: 20px 0 0 0;
+        animation: pulse 2s ease-in-out infinite;
+      ">
+        Loading your fitness data...
+      </p>
+    </div>
+  </div>
+
+  <style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes bounceIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.3);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.05);
+      }
+      70% {
+        transform: scale(0.9);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    
+    @keyframes slideInFromLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    @keyframes slideInFromRight {
+      from {
+        opacity: 0;
+        transform: translateX(50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Dark mode splash screen */
+    .dark-mode #splashScreen {
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #3a3a3a 100%) !important;
+    }
+    
+    .dark-mode #splashScreen h1 {
+      color: #00e5ff !important;
+    }
+    
+    .dark-mode #splashScreen p {
+      color: #80cbc4 !important;
+    }
+    
+    .dark-mode #splashScreen div[style*="border-top: 4px solid #00796b"] {
+      border-top-color: #00e5ff !important;
+    }
+  </style>
   <!-- Offline Notification -->
   <div class="offline-notification" id="offlineNotification">
     You are currently offline. Some features may be limited.
@@ -9961,6 +10125,72 @@ window.addEventListener('appinstalled', () => {
   console.log('🎉 Performa PWA: App installed successfully');
   deferredPrompt = null;
 });
+
+// Splash Screen Management
+function hideSplashScreen() {
+  const splashScreen = document.getElementById('splashScreen');
+  if (splashScreen) {
+    console.log('🎨 Hiding splash screen');
+    splashScreen.style.opacity = '0';
+    setTimeout(() => {
+      splashScreen.style.display = 'none';
+      // Remove from DOM to free memory
+      splashScreen.remove();
+    }, 500);
+  }
+}
+
+// Hide splash screen when app is ready
+function initializeSplashScreen() {
+  console.log('🎨 Initializing splash screen');
+  
+  // Minimum display time for splash screen (2 seconds)
+  const minDisplayTime = 2000;
+  const startTime = Date.now();
+  
+  // Wait for critical resources to load
+  const checkAppReady = () => {
+    const isDbReady = !!window.db;
+    const isDOMReady = document.readyState === 'complete';
+    const isTimerReady = !!document.getElementById('timer');
+    const isFormReady = !!document.getElementById('form');
+    
+    const appReady = isDbReady && isDOMReady && isTimerReady && isFormReady;
+    const timeElapsed = Date.now() - startTime;
+    
+    console.log('🔍 App readiness check:', {
+      dbReady: isDbReady,
+      domReady: isDOMReady,
+      timerReady: isTimerReady,
+      formReady: isFormReady,
+      timeElapsed: timeElapsed
+    });
+    
+    if (appReady && timeElapsed >= minDisplayTime) {
+      console.log('✅ App fully ready - hiding splash screen');
+      hideSplashScreen();
+    } else {
+      // Check again in 100ms
+      setTimeout(checkAppReady, 100);
+    }
+  };
+  
+  // Start checking after a short delay
+  setTimeout(checkAppReady, 500);
+  
+  // Failsafe: hide splash screen after maximum 8 seconds
+  setTimeout(() => {
+    console.log('⏰ Splash screen timeout - force hiding');
+    hideSplashScreen();
+  }, 8000);
+}
+
+// Initialize splash screen management when DOM is loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeSplashScreen);
+} else {
+  initializeSplashScreen();
+}
 
 // Handle URL parameters for shortcuts
 window.addEventListener('load', () => {
