@@ -8009,12 +8009,95 @@ function debugIdeals() {
   };
 }
 
+// Function to create test ideal data for testing autofill
+function createTestIdealData() {
+  if (!db) {
+    console.log('Database not ready');
+    return;
+  }
+  
+  const testIdeals = [
+    {
+      name: 'Push-ups',
+      type: 'reps',
+      category: 'C.S.A',
+      idealReps: 20
+    },
+    {
+      name: 'Plank',
+      type: 'iso',
+      category: 'C.S.A', 
+      idealTime: 60
+    },
+    {
+      name: 'Burpees',
+      type: 'semi',
+      category: 'C.S.A',
+      idealTime: 45,
+      idealReps: 10
+    },
+    {
+      name: 'Morning Run',
+      type: 'jog',
+      category: 'Cardio',
+      idealDistance: 5,
+      idealSpeed: 10
+    }
+  ];
+  
+  const tx = db.transaction("ideals", "readwrite");
+  const store = tx.objectStore("ideals");
+  
+  testIdeals.forEach(ideal => {
+    store.add(ideal);
+  });
+  
+  tx.oncomplete = () => {
+    console.log('Test ideal data created successfully!');
+    console.log('You can now test autofill with: Push-ups, Plank, Burpees, or Morning Run');
+  };
+  
+  tx.onerror = (e) => {
+    console.log('Some test data may already exist (this is normal)');
+  };
+}
+
 // Test function to manually trigger autofill
 function testAutofill() {
   const exerciseName = prompt('Enter exercise name to test autofill:');
   if (exerciseName) {
-    console.log('Testing autofill for:', exerciseName);
+    console.log('=== TESTING AUTOFILL FOR:', exerciseName, '===');
+    console.log('Current activity type:', document.getElementById('type')?.value);
+    console.log('Database ready:', !!db);
+    
+    // Test the autofill function
     triggerIdealAutofill(exerciseName);
+    
+    // Check result after a delay
+    setTimeout(() => {
+      console.log('=== AUTOFILL TEST RESULTS ===');
+      const type = document.getElementById('type')?.value;
+      console.log('Activity type after autofill:', type);
+      
+      if (type === 'reps') {
+        const idealValue = document.getElementById('idealValue')?.value;
+        console.log('Ideal reps value:', idealValue);
+      } else if (type === 'iso') {
+        const idealValue = document.getElementById('idealValue')?.value;
+        console.log('Ideal time value:', idealValue);
+      } else if (type === 'semi') {
+        const idealTime = document.getElementById('idealTime')?.value;
+        const idealReps = document.getElementById('idealReps')?.value;
+        console.log('Ideal time value:', idealTime);
+        console.log('Ideal reps value:', idealReps);
+      } else if (type === 'jog') {
+        const idealDistance = document.getElementById('idealDistance')?.value;
+        const idealSpeed = document.getElementById('idealSpeed')?.value;
+        console.log('Ideal distance value:', idealDistance);
+        console.log('Ideal speed value:', idealSpeed);
+      }
+      console.log('=== END AUTOFILL TEST ===');
+    }, 200);
   }
 }
 
@@ -8156,12 +8239,36 @@ function triggerIdealAutofill(name) {
   
   console.log('Starting ideal autofill for:', name.trim());
   
-  // Use the same smart detection logic as voice commands
-  detectAndSetExerciseData(name.trim(), false); // false = manual typing, true = voice command
+  // Add a small delay to ensure any previous DOM changes are complete
+  setTimeout(() => {
+    // Use the same smart detection logic as voice commands
+    detectAndSetExerciseData(name.trim(), false); // false = manual typing, true = voice command
+  }, 10);
 }
 
 function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
   console.log('detectAndSetExerciseData called with:', exerciseName, 'isVoiceCommand:', isVoiceCommand);
+  
+  // Validation function for ideal match data
+  const validateIdealMatch = (match) => {
+    if (!match || !match.name || !match.type) return false;
+    
+    // Check if the match has the required ideal values for its type
+    switch (match.type) {
+      case 'reps':
+        return match.idealReps !== undefined && match.idealReps !== null;
+      case 'iso':
+        return match.idealTime !== undefined && match.idealTime !== null;
+      case 'semi':
+        return (match.idealTime !== undefined && match.idealTime !== null) &&
+               (match.idealReps !== undefined && match.idealReps !== null);
+      case 'jog':
+        return (match.idealDistance !== undefined && match.idealDistance !== null) &&
+               (match.idealSpeed !== undefined && match.idealSpeed !== null);
+      default:
+        return false;
+    }
+  };
   
   // First check for ideal data, then fall back to previous entries
   const idealsReq = db.transaction("ideals", "readonly").objectStore("ideals").getAll();
@@ -8172,7 +8279,7 @@ function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
     const idealMatch = ideals.find(e => e.name?.toLowerCase() === exerciseName.toLowerCase());
     console.log('Found ideal match:', idealMatch);
 
-    if (idealMatch) {
+    if (idealMatch && validateIdealMatch(idealMatch)) {
       // Use ideal data for type and category
       console.log('Using ideal data - Type:', idealMatch.type, 'Category:', idealMatch.category);
       const typeField = document.getElementById('type');
@@ -8198,7 +8305,7 @@ function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
           if (isVoiceCommand) {
             speakFeedback(`${getVoiceCommands().logExerciseFeedback}: ${exerciseName} as ${idealMatch.type} for ${idealMatch.category}`);
           }
-        }, 50);
+        }, 100);
       } else {
         if (categoryField) categoryField.value = idealMatch.category;
         
@@ -8217,7 +8324,10 @@ function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
       }
     } else {
       // Fall back to previous entries detection
-      console.log('No ideal found, checking previous entries...');
+      if (idealMatch) {
+        console.log('Found ideal match but it has invalid data structure:', idealMatch);
+      }
+      console.log('No valid ideal found, checking previous entries...');
       const tx = db.transaction("entries", "readonly");
       const store = tx.objectStore("entries");
       const req = store.getAll();
@@ -8262,7 +8372,7 @@ function detectAndSetExerciseData(exerciseName, isVoiceCommand = false) {
             if (isVoiceCommand) {
               speakFeedback(`${getVoiceCommands().logExerciseFeedback}: ${exerciseName} as ${detectedType} for ${detectedCategory}`);
             }
-          }, 50);
+          }, 100);
         } else {
           if (categoryField) categoryField.value = detectedCategory;
           
@@ -8317,27 +8427,58 @@ function checkAndAutofillIdeal(name, type, category) {
 
               try {
         console.log('Autofilling values for type:', type, 'with data:', match);
-        if (type === "reps") {
-          const field = document.getElementById("idealValue");
-          console.log('Found idealValue field:', field, 'setting to:', match.idealReps);
-          if (field) field.value = match.idealReps || "";
-        } else if (type === "iso") {
-          const field = document.getElementById("idealValue");
-          console.log('Found idealValue field:', field, 'setting to:', match.idealTime);
-          if (field) field.value = match.idealTime || "";
-        } else if (type === "semi") {
-          const timeField = document.getElementById("idealTime");
-          const repsField = document.getElementById("idealReps");
-          console.log('Found time field:', timeField, 'reps field:', repsField);
-          if (timeField) timeField.value = match.idealTime || "";
-          if (repsField) repsField.value = match.idealReps || "";
-        } else if (type === "jog") {
-          const distanceField = document.getElementById("idealDistance");
-          const speedField = document.getElementById("idealSpeed");
-          console.log('Found distance field:', distanceField, 'speed field:', speedField);
-          if (distanceField) distanceField.value = match.idealDistance || "";
-          if (speedField) speedField.value = match.idealSpeed || "";
-        }
+        
+        // Add a small delay to ensure DOM elements are fully rendered
+        const fillIdealValues = () => {
+          if (type === "reps") {
+            const field = document.getElementById("idealValue");
+            console.log('Found idealValue field:', field, 'setting to:', match.idealReps);
+            if (field && match.idealReps !== undefined) {
+              field.value = match.idealReps;
+              console.log('Successfully set idealValue to:', match.idealReps);
+            }
+          } else if (type === "iso") {
+            const field = document.getElementById("idealValue");
+            console.log('Found idealValue field:', field, 'setting to:', match.idealTime);
+            if (field && match.idealTime !== undefined) {
+              field.value = match.idealTime;
+              console.log('Successfully set idealValue to:', match.idealTime);
+            }
+          } else if (type === "semi") {
+            const timeField = document.getElementById("idealTime");
+            const repsField = document.getElementById("idealReps");
+            console.log('Found time field:', timeField, 'reps field:', repsField);
+            if (timeField && match.idealTime !== undefined) {
+              timeField.value = match.idealTime;
+              console.log('Successfully set idealTime to:', match.idealTime);
+            }
+            if (repsField && match.idealReps !== undefined) {
+              repsField.value = match.idealReps;
+              console.log('Successfully set idealReps to:', match.idealReps);
+            }
+          } else if (type === "jog") {
+            const distanceField = document.getElementById("idealDistance");
+            const speedField = document.getElementById("idealSpeed");
+            console.log('Found distance field:', distanceField, 'speed field:', speedField);
+            if (distanceField && match.idealDistance !== undefined) {
+              distanceField.value = match.idealDistance;
+              console.log('Successfully set idealDistance to:', match.idealDistance);
+            }
+            if (speedField && match.idealSpeed !== undefined) {
+              speedField.value = match.idealSpeed;
+              console.log('Successfully set idealSpeed to:', match.idealSpeed);
+            }
+          }
+        };
+
+        // Try to fill immediately, but if fields don't exist, retry after a short delay
+        fillIdealValues();
+        
+        // Backup attempt in case fields weren't ready
+        setTimeout(() => {
+          fillIdealValues();
+        }, 50);
+        
       } catch (error) {
         console.error('Error autofilling ideal values:', error);
       }
