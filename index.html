@@ -8119,9 +8119,42 @@ function testAutofill() {
       console.log('=== END AUTOFILL TEST ===');
     }, 300);
   }
-  }
+    }
 
-// Comprehensive test for all activity types
+// Quick test to check database and ideal data status
+function checkDatabaseStatus() {
+  console.log('🔍 Database Status Check:');
+  console.log('Database object exists:', !!db);
+  
+  if (!db) {
+    console.log('❌ Database not initialized yet');
+    return;
+  }
+  
+  try {
+    const tx = db.transaction("ideals", "readonly");
+    const store = tx.objectStore("ideals");
+    const req = store.getAll();
+    
+    req.onsuccess = () => {
+      const ideals = req.result;
+      console.log('✅ Database working, found', ideals.length, 'ideal entries');
+      if (ideals.length === 0) {
+        console.log('💡 No ideal data found. Run createTestIdealData() first');
+      } else {
+        console.log('Ideal entries:', ideals.map(i => i.name).join(', '));
+      }
+    };
+    
+    req.onerror = () => {
+      console.log('❌ Database query failed');
+    };
+  } catch (error) {
+    console.log('❌ Database transaction error:', error);
+  }
+}
+  
+  // Comprehensive test for all activity types
 function testAllAutofill() {
   if (!db) {
     console.log('Database not ready');
@@ -8293,19 +8326,20 @@ function showAutofillTestInstructions() {
   console.log(`
 🧪 AUTOFILL TESTING INSTRUCTIONS:
 
-1. First, create test data:
-   createTestIdealData()
+1. Quick setup and test everything:
+   runCompleteAutofillTest()
 
-2. Test individual exercise:
-   testAutofill()
+2. Or step by step:
+   a) checkDatabaseStatus()
+   b) createTestIdealData()
+   c) testManualTyping()
 
-3. Test all exercises automatically:
-   testAllAutofill()
+3. Individual tests:
+   - testAutofill()
+   - testAllAutofill()
+   - debugIdeals()
 
-4. View current ideal data:
-   debugIdeals()
-
-5. Manual testing in UI:
+4. Manual testing in UI:
    - Select activity type (reps/iso/semi/jog)
    - Type exercise name: "Push-ups", "Plank", "Burpees", or "Morning Run"
    - Ideal values should auto-populate after you stop typing
@@ -8316,6 +8350,57 @@ Expected behavior:
 ✅ Works for all activity types
 ❌ Should NOT change activity type during manual typing
   `);
+}
+
+// Complete autofill test workflow
+function runCompleteAutofillTest() {
+  console.log('🚀 Running complete autofill test workflow...');
+  
+  // Step 1: Check database
+  checkDatabaseStatus();
+  
+  setTimeout(() => {
+    // Step 2: Create test data
+    console.log('\n📝 Creating test data...');
+    createTestIdealData();
+    
+    setTimeout(() => {
+      // Step 3: Test manual typing
+      console.log('\n🖊️ Testing manual typing...');
+      testManualTyping();
+    }, 1000);
+  }, 500);
+}
+
+// Simulate manual typing to test autofill
+function testManualTyping() {
+  console.log('🖊️ Testing manual typing simulation...');
+  
+  // Set activity type to reps
+  document.getElementById('type').value = 'reps';
+  renderFields();
+  
+  setTimeout(() => {
+    console.log('📝 Form rendered, now simulating typing "Push-ups"');
+    const exerciseField = document.getElementById('exerciseName');
+    if (exerciseField) {
+      exerciseField.value = 'Push-ups';
+      console.log('💻 Triggering oninput event...');
+      triggerIdealAutofill('Push-ups');
+      
+      setTimeout(() => {
+        const idealField = document.getElementById('idealValue');
+        console.log('🎯 Final result - ideal field value:', idealField?.value);
+        if (idealField?.value) {
+          console.log('✅ Manual typing autofill SUCCESS!');
+        } else {
+          console.log('❌ Manual typing autofill FAILED!');
+        }
+      }, 1000);
+    } else {
+      console.log('❌ Exercise name field not found!');
+    }
+  }, 100);
 }
   
   // Function to debug complex tasks
@@ -8349,7 +8434,7 @@ function showAutofillFeedback() {
 let autofillDebounceTimer = null;
 
 function triggerIdealAutofill(name) {
-  console.log('triggerIdealAutofill called with name:', name);
+  console.log('🔥 triggerIdealAutofill called with name:', name, 'length:', name?.length);
   
   // Clear previous debounce timer
   if (autofillDebounceTimer) {
@@ -8357,8 +8442,20 @@ function triggerIdealAutofill(name) {
   }
   
   if (!db) {
-    console.log('Database not ready, skipping autofill');
+    console.log('❌ Database not ready, skipping autofill');
     return; // Wait for database to be ready
+  }
+  
+  // Additional check to ensure database is actually working
+  try {
+    const testTx = db.transaction("ideals", "readonly");
+    if (!testTx) {
+      console.log('❌ Database transaction failed, skipping autofill');
+      return;
+    }
+  } catch (error) {
+    console.log('❌ Database error, skipping autofill:', error);
+    return;
   }
   if (!name.trim()) {
     console.log('Empty name, skipping autofill');
@@ -8367,18 +8464,23 @@ function triggerIdealAutofill(name) {
   
   // Debounce the autofill to avoid excessive calls during typing
   autofillDebounceTimer = setTimeout(() => {
-    console.log('Starting ideal autofill for:', name.trim());
+    console.log('⏰ Debounce triggered - Starting ideal autofill for:', name.trim());
     
     // For manual typing, only autofill ideal values for current activity type
     // Don't change the activity type to avoid disrupting user input
     const currentType = document.getElementById('type')?.value;
     const currentCategory = document.getElementById('category')?.value;
     
+    console.log('📋 Current form state - Type:', currentType, 'Category:', currentCategory);
+    console.log('🗄️ Database ready:', !!db);
+    
     if (currentType) {
-      console.log('Manual autofill for current type:', currentType);
+      console.log('✅ Manual autofill for current type:', currentType);
       checkAndAutofillIdeal(name.trim(), currentType, currentCategory);
+    } else {
+      console.log('❌ No current type selected, skipping autofill');
     }
-  }, 500); // Wait 500ms after user stops typing
+  }, 300); // Wait 300ms after user stops typing
 }
 
 // Function for voice commands that can change activity type and autofill
@@ -8545,7 +8647,7 @@ function detectAndSetExerciseDataForVoice(exerciseName) {
 }
 
 function checkAndAutofillIdeal(name, type, category) {
-  console.log('checkAndAutofillIdeal called with:', name, type, category);
+  console.log('🎯 checkAndAutofillIdeal called with:', name, type, category);
   if (!db) return;
   
   try {
@@ -8598,12 +8700,15 @@ function checkAndAutofillIdeal(name, type, category) {
         
         // Add a small delay to ensure DOM elements are fully rendered
         const fillIdealValues = () => {
+          console.log('💫 fillIdealValues called for type:', type, 'with match:', match);
           if (type === "reps") {
             const field = document.getElementById("idealValue");
-            console.log('Found idealValue field:', field, 'setting to:', match.idealReps);
+            console.log('🎯 Found idealValue field:', !!field, 'setting to:', match.idealReps);
             if (field && match.idealReps !== undefined) {
               field.value = match.idealReps;
-              console.log('Successfully set idealValue to:', match.idealReps);
+              console.log('✅ Successfully set idealValue to:', match.idealReps);
+            } else {
+              console.log('❌ Could not set reps value - field exists:', !!field, 'value defined:', match.idealReps !== undefined);
             }
           } else if (type === "iso") {
             const field = document.getElementById("idealValue");
