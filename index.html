@@ -46,6 +46,25 @@
       document.head.appendChild(script);
     })();
   </script>
+
+  <!-- Whisper.cpp offline speech recognition assets -->
+  <script>
+    (function() {
+      // Preload WASM to warm cache
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'fetch';
+      link.href = '/whisper/stream.wasm';
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+      // Load shim to override SpeechRecognition
+      const s = document.createElement('script');
+      s.src = '/whisper/whisper-recognition.js';
+      s.defer = true;
+      s.onerror = function(){ console.log('Whisper shim failed to load'); };
+      document.head.appendChild(s);
+    })();
+  </script>
   
   <!-- Fresh Memory Management System -->
   <script>

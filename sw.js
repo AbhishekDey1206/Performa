@@ -22,7 +22,14 @@ const STATIC_ASSETS = [
   './icon-144.png',
   './icon-96.png',
   './icon-72.png',
-  './icon-48.png'
+  './icon-48.png',
+  // Whisper offline ASR assets
+  './whisper/whisper-recognition.js',
+  './whisper/main.js',
+  './whisper/stream.wasm',
+  './whisper/helpers.js',
+  './whisper/ggml-tiny.en.bin',
+  './whisper/coi-serviceworker.js'
 ];
 
 // External resources with complete offline fallbacks
