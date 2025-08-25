@@ -22,7 +22,11 @@ const STATIC_ASSETS = [
   './icon-144.png',
   './icon-96.png',
   './icon-72.png',
-  './icon-48.png'
+  './icon-48.png',
+  './whisper.js',
+  'https://cdn.jsdelivr.net/npm/whisper.cpp@1.0.3/whisper.js',
+  'https://cdn.jsdelivr.net/npm/whisper.cpp@1.0.3/libwhisper.worker.js',
+  'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin'
 ];
 
 // External resources with complete offline fallbacks

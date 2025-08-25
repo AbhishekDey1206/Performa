@@ -2898,6 +2898,8 @@ window.simpleTest = function() {
     })();
   </script>
 
+  <script src="whisper.js"></script>
+
  <script>
 // Global variables - App fully functional with all syntax errors fixed
 let timerInterval, elapsed = 0;
@@ -11020,175 +11022,17 @@ function renderProgressChart(type = "total", from = null, to = null, exerciseNam
 }
 // Voice recognition with proper cleanup
 function startVoiceRecognition() {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    alert("Your browser does not support speech recognition");
-    return;
+  if (typeof startWhisperRecognition === 'function') {
+    startWhisperRecognition();
+  } else {
+    alert("Whisper is not available. Please try again later.");
   }
-
-  if (listening) {
-    stopVoiceRecognition();
-    return;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognizer = new SpeechRecognition();
-  
-  // Voice recognizer registered
-  recognizer.continuous = true;
-  recognizer.interimResults = false;
-  recognizer.lang = "en-US";
-
-  recognizer.onstart = function () {
-    listening = true;
-    updateVoiceStatus("Listening...", "listening");
-  };
-
-  recognizer.onresult = function (event) {
-    const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-    const commands = getVoiceCommands();
-    
-    addVoiceMessage('user', transcript);
-    
-    // Small delay before processing command to ensure voice message is shown
-    setTimeout(() => {
-      if (transcript.includes(commands.startTimer)) {
-        startTimer();
-        speakFeedback(commands.startTimerFeedback, 'startTimer');
-      } else if (transcript.includes(commands.stopTimer)) {
-        stopTimer();
-        speakFeedback(commands.stopTimerFeedback, 'stopTimer');
-      } else if (transcript.includes(commands.resetTimer)) {
-        resetTimer();
-        speakFeedback(commands.resetTimerFeedback);
-      } else if (transcript.includes(commands.startJog)) {
-        startJogging();
-        speakFeedback(commands.startJogFeedback);
-      } else if (transcript.includes(commands.stopJog)) {
-        stopJogging();
-        speakFeedback(commands.stopJogFeedback);
-      } else if (transcript.includes(commands.logExercise)) {
-        const exerciseName = transcript.split(commands.logExercise)[1].trim();
-        handleSmartExerciseLogging(exerciseName);
-      } else if (transcript.includes(commands.startTimerFor)) {
-        const timeText = transcript.split(commands.startTimerFor)[1].trim();
-        handleTimerForDuration(timeText);
-      } else if (transcript.includes(commands.addEntry)) {
-        const addBtn = document.getElementById('addEntry');
-        if (addBtn) {
-          addBtn.click();
-          speakFeedback(commands.addEntryFeedback, 'addEntry');
-        }
-      } else if (transcript.includes(commands.setActualReps)) {
-        const repsValue = transcript.split(commands.setActualReps)[1].trim();
-        const type = document.getElementById('type').value;
-        let repsField;
-        if (type === 'reps') {
-          repsField = document.getElementById('actualValue');
-        } else if (type === 'semi') {
-          repsField = document.getElementById('reps');
-        }
-
-        if (repsField) {
-          repsField.value = repsValue;
-          speakFeedback(`${commands.setActualRepsFeedback} ${repsValue}`);
-        }
-      } else if (transcript.includes(commands.showProgress)) {
-        showProgressView();
-        speakFeedback(`${commands.navigationFeedback} progress view`);
-      } else if (transcript.includes(commands.showArchive)) {
-        showArchiveView();
-        speakFeedback(`${commands.navigationFeedback} archive view`);
-      } else if (transcript.includes(commands.openSettings)) {
-        showSettingsView();
-        speakFeedback(`${commands.navigationFeedback} settings`);
-      } else if (transcript.includes(commands.goHome)) {
-        // Go back to main view
-        hideProgressView();
-        hideMasteredView();
-        hideIdealScoreView();
-        hideArchiveView();
-        hideSettingsView();
-        speakFeedback(`${commands.navigationFeedback} home`);
-      } else {
-        // Check complex tasks
-        let commandFound = false;
-        console.log('Checking complex tasks. Available tasks:', complexTasks.length);
-        for (const task of complexTasks) {
-          console.log('Checking task:', task.commands, 'against transcript:', transcript);
-          // Check if transcript matches any of the task's commands
-          const matchingCommand = task.commands ? 
-            task.commands.find(cmd => transcript.includes(cmd.toLowerCase())) :
-            (transcript.includes(task.command ? task.command.toLowerCase() : task.primaryCommand));
-            
-          if (matchingCommand) {
-            console.log('Found matching command:', matchingCommand, 'executing task:', task);
-            executeComplexTask(task);
-            commandFound = true;
-            break;
-          }
-        }
-        
-        // Check automation sequences
-        if (!commandFound) {
-          for (const automation of automationSequences) {
-            // Check if transcript matches any of the automation's commands
-            const matchingCommand = automation.commands ? 
-              automation.commands.find(cmd => transcript.includes(cmd.toLowerCase())) :
-              (transcript.includes(automation.command ? automation.command.toLowerCase() : automation.name.toLowerCase()));
-              
-            if (matchingCommand) {
-              executeAutomationSequence(automation);
-              commandFound = true;
-              break;
-            }
-          }
-        }
-        
-        if (!commandFound) {
-          // No command recognized
-          speakFeedback("Command not recognized. Please try again or check your voice settings.");
-        }
-      }
-    }, 50); // Small delay for voice message display
-  };
-
-  recognizer.onerror = function (event) {
-    console.error('Speech recognition error', event.error);
-    updateVoiceStatus("Voice Error", "error");
-    setTimeout(() => {
-      updateVoiceStatus("Voice: Ready", "ready");
-    }, 2000);
-  };
-
-  recognizer.onend = function () {
-    if (listening) {
-      // Don't auto-restart to prevent command loops
-      setTimeout(() => {
-        if (listening) recognizer.start();
-      }, 50);
-    } else {
-      stopVoiceRecognition();
-    }
-  };
-  
-  recognizer.start();
 }
 
 function stopVoiceRecognition() {
-  if (recognizer) {
-    try {
-      recognizer.stop();
-      recognizer.abort(); // Ensure complete cleanup
-      
-      // Voice recognizer unregistered
-      
-      recognizer = null; // Clear reference
-    } catch (err) {
-      console.error('Error stopping speech recognition:', err);
-    }
+  if (typeof stopWhisperRecognition === 'function') {
+    stopWhisperRecognition();
   }
-  listening = false;
-  updateVoiceStatus("Voice: Ready", "ready");
 }
 
 function updateVoiceStatus(text, state) {
