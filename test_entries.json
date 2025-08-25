@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "type": "reps",
+      "category": "C.S.A",
+      "name": "Push-ups",
+      "actual": 20,
+      "ideal": 20,
+      "score": "1.00",
+      "date": "08/19/2025"
+    },
+    {
+      "type": "iso",
+      "category": "C.P.E",
+      "name": "Plank",
+      "actual": 60,
+      "ideal": 60,
+      "score": "1.00",
+      "date": "08/19/2025"
+    }
+  ]
+}
