@@ -15,6 +15,8 @@
 */
 
 (function () {
+  // Preserve native recognizer for fallback
+  const NativeRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
   const WHISPER_BASE = "/whisper";
   const WHISPER_MAIN_JS = `${WHISPER_BASE}/main.js`;
   const WHISPER_WASM = `${WHISPER_BASE}/stream.wasm`;
@@ -71,6 +73,7 @@
       this._moduleLoaded = false;
       this._module = null;
       this._usingFallback = false;
+      this._fallbackShim = null;
       this._stdoutBuffer = [];
     }
 
@@ -80,6 +83,15 @@
       try {
         // Load helpers first (optional; used by upstream demo, safe to include)
         try { await loadScript(WHISPER_HELPERS); } catch {}
+
+        // Ensure model is available in MEMFS
+        if (!this._modelData) {
+          console.log('Whisper: fetching model for offline use:', WHISPER_MODEL);
+          const resp = await fetch(WHISPER_MODEL, { cache: 'force-cache' });
+          if (!resp.ok) throw new Error('model fetch failed: ' + resp.status);
+          this._modelData = await resp.arrayBuffer();
+          console.log('Whisper: model fetched, size bytes =', this._modelData.byteLength);
+        }
 
         // Configure Module for Emscripten
         const selfRef = this;
@@ -96,8 +108,18 @@
             }
           },
           printErr: (text) => console.warn(text),
-          // Attempt to run stream example with local model path
-          arguments: ['-m', WHISPER_MODEL, '-su', '0', '-tg', '2', '-ml', '1']
+          // Attempt to run stream example with model packaged into MEMFS
+          arguments: ['-m', '/models/ggml-tiny.en.bin', '-su', '0', '-tg', '2', '-ml', '1'],
+          preRun: [ function () {
+            try {
+              Module.FS_createPath('/', 'models', true, true);
+              if (selfRef._modelData) {
+                Module.FS_createDataFile('/models', 'ggml-tiny.en.bin', new Uint8Array(selfRef._modelData), true, false);
+              }
+            } catch (e) {
+              console.warn('Whisper preRun FS error:', e);
+            }
+          } ]
         };
         // Expose globally for main.js
         window.Module = Module;
@@ -136,25 +158,46 @@
       // Try whisper init; if fails, fall back
       const ok = await this._initWhisper();
       if (!ok) {
-        this._usingFallback = true;
-        // If sw has enhancedOfflineVoice, use its recognition shim
+        // Prefer native speech recognition if available
+        if (NativeRecognition) {
+          try {
+            const shim = new NativeRecognition();
+            shim.continuous = this.continuous;
+            shim.interimResults = this.interimResults;
+            shim.lang = this.lang;
+            shim.onresult = (e) => this.onresult && this.onresult(e);
+            shim.onerror = (e) => this.onerror && this.onerror(e);
+            shim.onend = () => this.onend && this.onend();
+            this._usingFallback = true;
+            this._fallbackShim = shim;
+            this._listening = true;
+            this.onstart && this.onstart();
+            // Beep on start
+            try { const b = document.getElementById('voiceBeep'); b && b.play && b.play(); } catch {}
+            shim.start();
+            return;
+          } catch (e) {
+            console.warn('Native SpeechRecognition fallback unavailable:', e);
+          }
+        }
+        // Else try offline simulation if present
         const OfflineCtor = (window.enhancedOfflineVoice && function(){ return window.enhancedOfflineVoice.recognition; }) ||
                             (window.offlineVoice && function(){ return window.offlineVoice.recognition; });
         if (OfflineCtor) {
           try {
             const shim = OfflineCtor();
-            // Bridge events
             shim.onresult = (e) => this.onresult && this.onresult(e);
             shim.onerror = (e) => this.onerror && this.onerror(e);
             shim.onend = () => this.onend && this.onend();
+            this._usingFallback = true;
+            this._fallbackShim = shim;
             this._listening = true;
             this.onstart && this.onstart();
+            try { const b = document.getElementById('voiceBeep'); b && b.play && b.play(); } catch {}
             shim.start();
-            // Store to stop later
-            this._fallbackShim = shim;
             return;
           } catch (e) {
-            console.warn('Fallback offline shim unavailable:', e);
+            console.warn('Offline shim fallback unavailable:', e);
           }
         }
       }
@@ -176,6 +219,8 @@
 
         this._listening = true;
         if (this.onstart) this.onstart();
+        // Beep when mic is live
+        try { const b = document.getElementById('voiceBeep'); b && b.play && b.play(); } catch {}
       } catch (err) {
         this._listening = false;
         if (this.onerror) this.onerror({ error: err && err.message ? err.message : 'mic-initialization-failed' });
